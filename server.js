@@ -189,16 +189,19 @@ app.post('/api/process-audio', upload.single('audio'), async (req, res) => {
               </div>
             `
           };
-
-          await transporter.sendMail(mailOptions);
-          emailStatus = 'sent';
-          console.log('Email sent successfully');
+          // Send email in background to avoid blocking HTTP response and causing client-side timeouts
+          transporter.sendMail(mailOptions).then(() => {
+            console.log('Email sent successfully in background');
+          }).catch((mailErr) => {
+            console.error('Failed to send email in background:', mailErr.message);
+          });
+          emailStatus = 'sent_pending';
         } else {
           console.log('SMTP configuration is missing. Skipping email sending.');
           emailStatus = 'missing_config';
         }
       } catch (mailErr) {
-        console.error('Failed to send email:', mailErr);
+        console.error('Failed to initiate email sending:', mailErr);
         emailStatus = 'failed';
         emailError = mailErr.message;
       }
