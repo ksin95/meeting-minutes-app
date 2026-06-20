@@ -8,9 +8,33 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const formatForEmailCopy = (text) => {
+    if (!text) return '';
+    let formatted = text;
+    
+    // Remove bold asterisks (e.g. **bold** -> bold)
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '$1');
+    
+    // Convert Headers to clean Japanese business email style section dividers
+    formatted = formatted.replace(/^# (.*$)/gim, '■■ $1 ■■\n━━━━━━━━━━━━━━━━━━━━━━━━');
+    formatted = formatted.replace(/^## (.*$)/gim, '■ $1\n────────────────────────');
+    formatted = formatted.replace(/^### (.*$)/gim, '【$1】');
+    
+    // Convert markdown bullets (- or *) to clean email bullets (・)
+    formatted = formatted.replace(/^[\-\*] (.*$)/gim, '・$1');
+    
+    // Add extra newlines before section headers if not already there to ensure clean spacing
+    formatted = formatted.replace(/\n(■■|■|【)/g, '\n\n$1');
+    
+    return formatted;
+  };
+
   const copyToClipboard = async () => {
     try {
-      const textToCopy = activeTab === 'minutes' ? minutes : transcript;
+      let textToCopy = activeTab === 'minutes' ? minutes : transcript;
+      if (activeTab === 'minutes') {
+        textToCopy = formatForEmailCopy(textToCopy);
+      }
       await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
