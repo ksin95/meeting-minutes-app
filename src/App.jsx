@@ -70,6 +70,7 @@ function App() {
   const audioChunksRef = useRef([]);
   const timerIntervalRef = useRef(null);
   const streamRef = useRef(null);
+  const wakeLockRef = useRef(null);
 
   // --- Load settings from LocalStorage ---
   useEffect(() => {
@@ -103,6 +104,43 @@ function App() {
   const saveToLocal = (key, value) => {
     localStorage.setItem(key, value);
   };
+
+  // --- Wake Lock Functions (Prevent Sleep) ---
+  const requestWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        console.log('Screen Wake Lock acquired');
+      }
+    } catch (err) {
+      console.warn('Wake Lock request failed:', err.message);
+    }
+  };
+
+  const releaseWakeLock = () => {
+    if (wakeLockRef.current !== null) {
+      wakeLockRef.current.release().then(() => {
+        wakeLockRef.current = null;
+        console.log('Screen Wake Lock released');
+      }).catch(err => {
+        console.error('Error releasing wake lock:', err);
+      });
+    }
+  };
+
+  // Handle visibility change to re-acquire wake lock if page becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isRecording && wakeLockRef.current === null) {
+        await requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isRecording]);
 
   // --- Recording Control Functions ---
   const startRecording = async () => {
@@ -156,6 +194,9 @@ function App() {
       recorder.start(1000);
       setIsRecording(true);
 
+      // Request Wake Lock to prevent screen sleep during recording
+      await requestWakeLock();
+
       // Start timer
       timerIntervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
@@ -177,6 +218,9 @@ function App() {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
+
+      // Release Wake Lock to allow screen sleep again
+      releaseWakeLock();
 
       // Clear timer interval
       if (timerIntervalRef.current) {
