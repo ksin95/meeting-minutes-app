@@ -49,6 +49,14 @@ function App() {
   const [transcript, setTranscript] = useState('');
   const [minutes, setMinutes] = useState('');
   const [activeTab, setActiveTab] = useState('minutes'); // minutes, transcript
+  const [history, setHistory] = useState([]);
+
+  const loadHistoryItem = (item) => {
+    setMinutes(item.minutes);
+    setTranscript(item.transcript);
+    setStatus('success');
+    setActiveTab('minutes');
+  };
 
   // --- Settings States ---
   const [geminiApiKey, setGeminiApiKey] = useState(DEFAULT_KEY);
@@ -97,6 +105,14 @@ function App() {
     // If key and email are already saved, collapse settings by default
     if (savedApiKey && savedEmail) {
       setShowSettings(false);
+    }
+
+    // Load history from LocalStorage
+    try {
+      const savedHistory = JSON.parse(localStorage.getItem('meeting_history')) || [];
+      setHistory(savedHistory);
+    } catch (histErr) {
+      console.error('Failed to load history:', histErr);
     }
   }, []);
 
@@ -275,6 +291,39 @@ function App() {
       setEmailStatus(data.emailStatus);
       setStatus('success');
       setActiveTab('minutes');
+
+      // Save new record to history
+      try {
+        const extractTitle = (md) => {
+          if (!md) return '';
+          const match = md.match(/■■?\s*(.*?)\s*■■?/) || md.match(/^#+\s*(.*?)\s*$/m);
+          return match ? match[1].trim() : '';
+        };
+
+        const title = extractTitle(data.minutes) || `会議録音 (${new Date().toLocaleDateString('ja-JP')})`;
+        
+        const newItem = {
+          id: Date.now(),
+          date: new Date().toLocaleString('ja-JP', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          title,
+          minutes: data.minutes,
+          transcript: data.transcript
+        };
+
+        setHistory(prevHistory => {
+          const updated = [newItem, ...prevHistory].slice(0, 5);
+          localStorage.setItem('meeting_history', JSON.stringify(updated));
+          return updated;
+        });
+      } catch (histErr) {
+        console.error('Failed to save to history:', histErr);
+      }
 
     } catch (err) {
       console.error('処理エラー:', err);
@@ -707,6 +756,34 @@ function App() {
             )}
           </div>
         </section>
+
+        {/* --- HISTORY LIST SECTION --- */}
+        {history.length > 0 && (
+          <section className="glass-panel history-container">
+            <h2>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="settings-icon">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              作成履歴 (過去5件)
+            </h2>
+            <div className="history-list">
+              {history.map((item) => (
+                <div key={item.id} className="history-item">
+                  <div className="history-info">
+                    <span className="history-date">{item.date}</span>
+                    <span className="history-title">{item.title}</span>
+                  </div>
+                  <div className="history-actions">
+                    <button onClick={() => loadHistoryItem(item)} className="history-view-btn">
+                      表示
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       <footer>
