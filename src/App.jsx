@@ -59,7 +59,7 @@ function App() {
   const [smtpUser, setSmtpUser] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
-  const [geminiModel, setGeminiModel] = useState('gemini-2.5-flash');
+  const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash');
 
   // --- UI Toggles ---
   const [showSettings, setShowSettings] = useState(true);
@@ -82,7 +82,7 @@ function App() {
     const savedSmtpUser = localStorage.getItem('smtp_user') || '';
     const savedSmtpPass = localStorage.getItem('smtp_pass') || '';
     const savedPrompt = localStorage.getItem('custom_prompt') || '';
-    const savedModel = localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
+    const savedModel = localStorage.getItem('gemini_model') || 'gemini-2.0-flash';
 
     setGeminiApiKey(savedApiKey);
     setGeminiModel(savedModel);
