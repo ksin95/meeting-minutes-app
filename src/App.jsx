@@ -68,7 +68,7 @@ function App() {
   const [smtpUser, setSmtpUser] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
-  const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash');
+  const [geminiModel, setGeminiModel] = useState('gemini-2.5-flash');
 
   // --- UI Toggles ---
   const [showSettings, setShowSettings] = useState(true);
@@ -98,7 +98,12 @@ function App() {
     const savedSmtpUser = localStorage.getItem('smtp_user') || '';
     const savedSmtpPass = localStorage.getItem('smtp_pass') || '';
     const savedPrompt = localStorage.getItem('custom_prompt') || '';
-    const savedModel = localStorage.getItem('gemini_model') || 'gemini-2.0-flash';
+    let savedModel = localStorage.getItem('gemini_model');
+    // Upgrade old default model to gemini-2.5-flash
+    if (savedModel === 'gemini-2.0-flash' || !savedModel) {
+      savedModel = 'gemini-2.5-flash';
+      localStorage.setItem('gemini_model', 'gemini-2.5-flash');
+    }
 
     setGeminiApiKey(savedApiKey);
     setGeminiModel(savedModel);
@@ -620,7 +625,7 @@ function App() {
                   />
                 </div>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>
-                  ※標準は `gemini-1.5-flash` です。もしエラーが出る場合は `gemini-1.5-flash-latest` や `gemini-2.0-flash` などの最新モデル名を入力してください。
+                  ※標準は `gemini-2.5-flash` です。もしエラーが出る場合は `gemini-1.5-flash` や `gemini-2.0-flash` などの別のモデル名を入力してください。
                 </p>
               </div>
 
