@@ -58,6 +58,59 @@ function fileToGenerativePart(filePath, mimeType) {
 }
 
 /**
+ * API: Check API connection and quota availability
+ */
+app.post('/api/check-api', async (req, res) => {
+  const { apiKey, modelName } = req.body;
+  
+  if (!apiKey) {
+    return res.status(400).json({ error: 'APIキーが設定されていません。' });
+  }
+
+  const selectedModel = modelName || "gemini-2.0-flash";
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: selectedModel });
+
+    // Make a tiny request (1 token max output) to test connection and quota
+    await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+      generationConfig: { maxOutputTokens: 1 }
+    });
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('API Check failed:', error);
+    
+    // Run diagnostics
+    let diagnosticMsg = '';
+    try {
+      const diagUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+      const diagResp = await fetch(diagUrl);
+      const diagData = await diagResp.json();
+      
+      if (!diagResp.ok) {
+        console.error('--- Gemini API Key Diagnostic Result (Check) ---');
+        console.error('API Error details:', JSON.stringify(diagData));
+        if (diagData.error && diagData.error.message) {
+          diagnosticMsg = `【APIキー診断結果】: ${diagData.error.message}`;
+        }
+      }
+    } catch (diagErr) {
+      console.error('Failed to run check diagnostics:', diagErr.message);
+    }
+
+    const clientErrorMsg = diagnosticMsg 
+      ? `${error.message}\n\n${diagnosticMsg}`
+      : (error.message || 'API接続確認に失敗しました。');
+
+    res.status(400).json({ error: clientErrorMsg });
+  }
+});
+
+/**
  * API: Process Audio - Transcribe, Create Minutes, and optionally Email
  */
 app.post('/api/process-audio', upload.single('audio'), async (req, res) => {

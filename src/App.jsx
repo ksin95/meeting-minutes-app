@@ -43,7 +43,8 @@ function App() {
     }
   };
   const [recordingTime, setRecordingTime] = useState(0);
-  const [status, setStatus] = useState('idle'); // idle, recording, uploading, processing, success, error
+  const [status, setStatus] = useState('idle'); // idle, checking, recording, uploading, processing, success, error
+  const [lastAudioBlob, setLastAudioBlob] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [emailStatus, setEmailStatus] = useState('');
   const [transcript, setTranscript] = useState('');
@@ -171,10 +172,38 @@ function App() {
       setRecordingTime(0);
       setTranscript('');
       setMinutes('');
-      setStatus('recording');
+      setStatus('checking');
       setErrorMessage('');
       setEmailStatus('');
+      setLastAudioBlob(null);
       audioChunksRef.current = [];
+
+      // API Key & Quota Connection Check
+      try {
+        const checkResponse = await fetch('/api/check-api', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            apiKey: geminiApiKey,
+            modelName: geminiModel
+          })
+        });
+
+        const checkData = await checkResponse.json();
+
+        if (!checkResponse.ok) {
+          throw new Error(checkData.error || 'APIの接続テストに失敗しました。利用制限またはキーが無効の可能性があります。');
+        }
+      } catch (checkErr) {
+        console.error('API connection check failed:', checkErr);
+        setStatus('error');
+        setErrorMessage(`【録音前接続エラー】Gemini APIとの接続テストに失敗しました。キーが正しいか、または利用制限に達していないかご確認ください。\n\n詳細: ${checkErr.message}`);
+        return;
+      }
+
+      setStatus('recording');
 
       // Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -203,6 +232,7 @@ function App() {
 
       recorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        setLastAudioBlob(audioBlob);
         processAudio(audioBlob);
       };
 
@@ -243,6 +273,20 @@ function App() {
         clearInterval(timerIntervalRef.current);
       }
     }
+  };
+
+  // --- Download Audio File Backup ---
+  const downloadLastAudio = () => {
+    if (!lastAudioBlob) return;
+    const ext = lastAudioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+    const url = URL.createObjectURL(lastAudioBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meeting-audio-${new Date().toISOString().slice(0, 10)}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // --- Send Audio to Backend ---
@@ -420,6 +464,13 @@ function App() {
         </section>
 
         {/* --- STATUS BANNER --- */}
+        {status === 'checking' && (
+          <div className="status-banner processing">
+            <div className="spinner"></div>
+            <span>Gemini API の接続性と利用枠（クォータ）を確認中...</span>
+          </div>
+        )}
+
         {status === 'processing' && (
           <div className="status-banner processing">
             <div className="spinner"></div>
@@ -446,7 +497,57 @@ function App() {
             <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
-            <span>{errorMessage}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+              <span style={{ whiteSpace: 'pre-wrap' }}>{errorMessage}</span>
+              {lastAudioBlob && (
+                <div style={{ display: 'flex', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  <button 
+                    onClick={() => processAudio(lastAudioBlob)} 
+                    className="action-btn-retry"
+                    style={{
+                      background: 'var(--primary)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      fontWeight: 'bold',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '4px' }}>
+                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                    </svg>
+                    再試行
+                  </button>
+                  <button 
+                    onClick={downloadLastAudio} 
+                    className="action-btn-download"
+                    style={{
+                      background: '#4a5568',
+                      color: 'white',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      fontWeight: 'bold',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '4px' }}>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                    </svg>
+                    音声をダウンロード (救済バックアップ)
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
