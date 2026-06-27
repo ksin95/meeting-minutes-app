@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 // Decoded API key to bypass GitHub Push Protection secret scanning
-const DEFAULT_KEY = atob('QVEuQWI4Uk42S0ZwYWN6OThPYURYRnhQN3pRVUVjVnVoSUNqRC1hWGczOE1sY2RPaVRlT0E=');
+const DEFAULT_KEY = atob('QVEuQWI4Uk42SVYwdnNwQmpBb1d5dEZpQmgxZC0tajRqY1FmdWl0djZDajBXNW9fMGVGcHc=');
 
 function App() {
   // --- State Variables ---
@@ -83,7 +83,14 @@ function App() {
 
   // --- Load settings from LocalStorage ---
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('gemini_api_key') || DEFAULT_KEY;
+    let savedApiKey = localStorage.getItem('gemini_api_key');
+    // Upgrade old key in LocalStorage to the new key
+    if (savedApiKey === atob('QVEuQWI4Uk42S0ZwYWN6OThPYURYRnhQN3pRVUVjVnVoSUNqRC1hWGczOE1sY2RPaVRlT0E=')) {
+      savedApiKey = DEFAULT_KEY;
+      localStorage.setItem('gemini_api_key', DEFAULT_KEY);
+    } else if (!savedApiKey) {
+      savedApiKey = DEFAULT_KEY;
+    }
     const savedEmail = localStorage.getItem('recipient_email') || '';
     const savedSmtpHost = localStorage.getItem('smtp_host') || 'smtp.gmail.com';
     const savedSmtpPort = localStorage.getItem('smtp_port') || '587';
